@@ -55,11 +55,11 @@ def extract_RR(video_path):
             x, y, w, h = roi
             old_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
             roi_points = np.array([[x + w // 2, y + h // 2]], dtype=np.float32).reshape(-1, 1, 2)
-            lk_params = dict(winSize=(15, 15), maxLevel=2,
-                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
             print("ROI selected. Starting video processing...")
         
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        lk_params = dict(winSize=(15, 15), maxLevel=2,
+                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
         new_points, status, _ = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, roi_points, None, **lk_params)
         if status:
             new_x, new_y = new_points[0][0]
@@ -88,8 +88,7 @@ def extract_RR(video_path):
             x, y, w, h = roi
             old_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
             roi_points = np.array([[x + w // 2, y + h // 2]], dtype=np.float32).reshape(-1, 1, 2)
-            lk_params = dict(winSize=(15, 15), maxLevel=2,
-                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+            
             # Initialize the tracker
             #tracker = cv2.TrackerKCF_create()
             # tracker = cv2.TrackerKCF_create()
@@ -111,8 +110,6 @@ def extract_RR(video_path):
             x, y, w, h = roi
             old_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
             roi_points = np.array([[x + w // 2, y + h // 2]], dtype=np.float32).reshape(-1, 1, 2)
-            lk_params = dict(winSize=(15, 15), maxLevel=2,
-                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
             print("ROI selected. Continuing video processing...")
 
         elif key == ord('q'):
