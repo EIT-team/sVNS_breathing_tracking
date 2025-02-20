@@ -26,7 +26,7 @@ def write_to_csv(path_to_csv,detected_data):
 
 def extract_RR(video_path):
     cap = cv2.VideoCapture(video_path)
-    
+    tracker = cv2.TrackerKCF_create()    
     frame_count = 0
     frame_skip = 1
     roi = None
@@ -40,30 +40,21 @@ def extract_RR(video_path):
             print("Error: Could not read video.")
             cap.release()
             break
-        
-        
-
         # Rotate if there's an issue with the smartphone metadata interpretation
         frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
         H, W, _ = frame.shape # get the frame dimensions
         
-
         if frame_count == 0:
             # Show the first frame and let the user select the region of interest
             print("Displaying first frame for ROI selection...")
             roi = select_roi(frame)
+            tracker.init(frame, roi)  # Initialize tracker with ROI
             x, y, w, h = roi
-            old_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
-            roi_points = np.array([[x + w // 2, y + h // 2]], dtype=np.float32).reshape(-1, 1, 2)
             print("ROI selected. Starting video processing...")
-        
-        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        lk_params = dict(winSize=(15, 15), maxLevel=2,
-                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
-        new_points, status, _ = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, roi_points, None, **lk_params)
-        if status:
-            new_x, new_y = new_points[0][0]
-            x, y = int(new_x - w // 2), int(new_y - h // 2)
+        success, roi = tracker.update(frame)
+        if success:
+            x,y,w,h = map(int,roi)
+            cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
             # expandVal = 40
             # x1 = max(0, x-expandVal)
             # y1 = max(0, y-expandVal)
@@ -76,23 +67,15 @@ def extract_RR(video_path):
             # Perform OCR on the zoomed frame
            
                 # Draw results on the frame
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
             # cv2.putText(frame, f"{text} ({confidence:.2f})", (x, y - 10),
             #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            old_gray = frame_gray.copy()
-            roi_points = new_points
+            # old_gray = frame_gray.copy()
+            # roi_points = new_points
         # if tracker update unsuccessful
         else:
             print("Tracking lost. Re-select ROI...")
             roi = select_roi(frame)
-            x, y, w, h = roi
-            old_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
-            roi_points = np.array([[x + w // 2, y + h // 2]], dtype=np.float32).reshape(-1, 1, 2)
-            
-            # Initialize the tracker
-            #tracker = cv2.TrackerKCF_create()
-            # tracker = cv2.TrackerKCF_create()
-            # tracker.init(frame, roi)
+            tracker.init(frame, roi)  # Initialize tracker with ROI
             print("ROI selected. Starting video processing...")
         # Display the current frame
         aspRatio = W / H
@@ -107,9 +90,7 @@ def extract_RR(video_path):
         if key == ord('a'):
             print("Manual adjustment of ROI...")
             roi = select_roi(frame)
-            x, y, w, h = roi
-            old_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
-            roi_points = np.array([[x + w // 2, y + h // 2]], dtype=np.float32).reshape(-1, 1, 2)
+            tracker.init(frame, roi)  # Initialize tracker with ROI
             print("ROI selected. Continuing video processing...")
 
         elif key == ord('q'):
