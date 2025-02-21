@@ -1,7 +1,20 @@
 import cv2
 import numpy as np
-import easyocr
+# import easyocr
 import csv
+import time
+import matplotlib.pyplot as plt
+from scipy.signal import butter, filtfilt
+
+def butter_lowpass_filter(data, cutoff=0.5, fs=30, order=4):
+    nyquist = 0.5 * fs
+    normal_cutoff = cutoff / nyquist
+    b,a = butter(order,normal_cutoff,btype='low',analog=False)
+    return filtfilt(b,a,data)
+
+def is_filter_stable(b,a):
+    poles = np.roots(a) # compute poles as roots of the denomintor a
+    return np.all(np.abs(poles) < 1)
 
 def select_roi(frame):
     """
@@ -33,6 +46,8 @@ def extract_RR(video_path):
     detected_data = {}
     cv2.namedWindow("Video Processing", cv2.WINDOW_KEEPRATIO)
     target_width = 1280
+    areas = []
+    timestamps = []
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -55,6 +70,35 @@ def extract_RR(video_path):
         if success:
             x,y,w,h = map(int,roi)
             cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
+
+            hsv = cv2.cvtColor(frame[y:y+h, x:x+w],cv2.COLOR_BGR2HSV)
+            # Original values:
+            # lower_green = np.array([35,50,50])
+            # upper_green = np.array([85,255,255])
+
+            #Experimental
+            lower_green = np.array([35,50,50])
+            upper_green = np.array([85,255,255])
+
+            mask = cv2.inRange(hsv,lower_green,upper_green)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                max_contour = max(contours, key=cv2.contourArea)
+                area = cv2.contourArea(max_contour)
+                areas.append(area)
+                timestamps.append(time.time())
+
+                # Adjust contour coordinates to match full frame
+                max_contour_shifted = max_contour + np.array([x, y])  # Shift contour back to full-frame coordinates
+
+                # cv2.drawContours(frame[y:y+h, x:x+w],[max_contour],-1,(0,255,0),2)
+                # cv2.putText(frame[y:y+h, x:x+w],f"Area = {area}",(x,y+h+10),cv2.FONT_HERSHEY_SIMPLEX,
+                #             0.5,(0,255,0),2)
+
+                cv2.drawContours(frame, [max_contour_shifted], -1, (0, 255, 0), 2)
+                text_position = (x, y - 10 if y > 20 else y + h + 20)  # Adjust if near top edge
+                cv2.putText(frame, f"Area = {area:.2f}", text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+
             # expandVal = 40
             # x1 = max(0, x-expandVal)
             # y1 = max(0, y-expandVal)
@@ -77,6 +121,11 @@ def extract_RR(video_path):
             roi = select_roi(frame)
             tracker.init(frame, roi)  # Initialize tracker with ROI
             print("ROI selected. Starting video processing...")
+        
+        
+        
+
+        
         # Display the current frame
         aspRatio = W / H
         new_height = int(target_width / aspRatio)
@@ -98,13 +147,46 @@ def extract_RR(video_path):
 
     cap.release()
     cv2.destroyAllWindows()
-    return detected_data
+    timestamps = np.array(timestamps) # convert for the normalistaion
+    timestamps -= timestamps[0]
+    return detected_data, areas, timestamps
 
 
 if __name__ == "__main__":
     #video_path = r"C:\Users\erutkovs\OneDrive - University College London\MRes sVNS project\Human trial\human_trial_recordings\data_06012025_pat_14\video\Human 014 060125\014_sVNS_C_1.6mA 1ms 20Hz 30s~3.mp4"  # Replace with the path to your video file
     #video_path = r"../../data_06012025_pat_14\video\Human 014 060125\014_sVNS_C_1.6mA 1ms 20Hz 30s~3.mp4"
     video_path = "../data_06012025_pat_14/video/Human 014 060125/014_sVNS_P_900uA 1ms 20Hz 30s.mp4"
-    detected_data = extract_RR(video_path)
+    detected_data, areas, timestamps = extract_RR(video_path)
     #print("Final Detected Data:", detected_data)
     #write_to_csv("../../data_06012025_pat_14/video/processed/014_sVNS_P_900uA 1ms 20Hz 30s~2.csv", detected_data)
+
+    # Visualise
+    plt.figure()
+    plt.subplot(2,1,1)
+    plt.plot(timestamps,areas,marker='o',linestyle='-',color='b',label='Area change')
+    plt.xlabel("Time (s)")
+    plt.ylabel("Detected Area")
+    plt.title("Area Change Over Time")
+    plt.legend()
+    plt.grid(True)
+
+    # smoothed areas
+    
+    plt.subplot(2,1,2)
+    
+    order = 4
+    cutoff = 2
+    fs = 30
+    normal_cutoff = cutoff / (fs/2)
+    b,a = butter(order,normal_cutoff,btype='low',analog=False)
+    print("Filter is stable? ", is_filter_stable(b,a))
+
+    smoothed_areas = butter_lowpass_filter(areas, cutoff, fs, order)
+    plt.plot(smoothed_areas,linestyle='-', linewidth=2, color='b', label='Smoothed Area')
+    plt.xlabel("Time (s)")
+    plt.ylabel("Detected Area")
+    plt.title("Smoothed Area Change Over Time")
+    plt.legend()
+    plt.grid(True)
+
+    plt.show()
