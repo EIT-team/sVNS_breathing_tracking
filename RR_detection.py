@@ -69,37 +69,51 @@ def extract_RR(video_path):
         if success:
             x,y,w,h = map(int,roi)
             cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
-
-            hsv = cv2.cvtColor(frame[y:y+h, x:x+w],cv2.COLOR_BGR2HSV)
+            frame_roi = frame[y:y+h, x:x+w]
+            #hsv = cv2.cvtColor(frame[y:y+h, x:x+w],cv2.COLOR_BGR2HSV)
+            hsv = cv2.cvtColor(frame_roi,cv2.COLOR_BGR2HSV)
             # Original values:
             # lower_green = np.array([35,50,50])
             # upper_green = np.array([85,255,255])
 
             #Experimental
             lower_green = np.array([35,50,50])
-            upper_green = np.array([85,255,255])
+            upper_green = np.array([90,255,255])
 
             mask = cv2.inRange(hsv,lower_green,upper_green)
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if contours:
-                max_contour = max(contours, key=cv2.contourArea)
-                area = cv2.contourArea(max_contour)
-                areas.append(area)
+            green_region = cv2.bitwise_and(frame_roi,frame_roi,mask=mask)
+            gray = cv2.cvtColor(green_region, cv2.COLOR_BGR2GRAY)
+            
+            sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=5)
+            sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=5)
+            edges = np.sqrt(sobel_x**2 + sobel_y**2)
+            # Normalize and threshold to get binary edge image
+            edges = np.uint8(255 * edges / np.max(edges))
+            
+            _, edge_binary = cv2.threshold(edges, 50, 255, cv2.THRESH_BINARY)
+            sobel_edges_colored = cv2.merge([edge_binary, edge_binary, edge_binary])
+            edges_black = cv2.bitwise_not(sobel_edges_colored)
+            frame[y:y+h, x:x+w] = cv2.bitwise_and(frame[y:y+h, x:x+w], edges_black)
+            # Calculate edge metric (e.g., total edge pixel count)
+            edge_metric = np.sum(edge_binary > 0)
+            areas.append(edge_metric)
                 #timestamps.append(time.time())
-                timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0) # ms / 1000 => seconds
-
+            timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0) # ms / 1000 => seconds
+           
+    # Calculate edge metric (e.g., total edge pixel count)
+            edge_metric = np.sum(edge_binary > 0)
 
                 # Adjust contour coordinates to match full frame
-                max_contour_shifted = max_contour + np.array([x, y])  # Shift contour back to full-frame coordinates
+               # max_contour_shifted = max_contour + np.array([x, y])  # Shift contour back to full-frame coordinates
 
                 # cv2.drawContours(frame[y:y+h, x:x+w],[max_contour],-1,(0,255,0),2)
                 # cv2.putText(frame[y:y+h, x:x+w],f"Area = {area}",(x,y+h+10),cv2.FONT_HERSHEY_SIMPLEX,
                 #             0.5,(0,255,0),2)
 
-                cv2.drawContours(frame, [max_contour_shifted], -1, (0, 255, 0), 2)
-                text_position = (x, y - 10 if y > 20 else y + h + 20)  # Adjust if near top edge
-                cv2.putText(frame, f"Area = {area:.2f}", text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-
+                # cv2.drawContours(frame, [max_contour_shifted], -1, (0, 255, 0), 2)
+            
+            text_position = (x, y - 10 if y > 20 else y + h + 20)  # Adjust if near top edge
+            cv2.putText(frame, f"Area = {edge_metric:.2f}", text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             # expandVal = 40
             # x1 = max(0, x-expandVal)
             # y1 = max(0, y-expandVal)
