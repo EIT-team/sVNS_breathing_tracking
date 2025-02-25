@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 # import easyocr
 import csv
-import time
+import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
 
@@ -25,17 +25,17 @@ def select_roi(frame):
     cv2.destroyWindow("Select ROI")
     return roi
 
-def write_to_csv(path_to_csv,detected_data):
-    with open(path_to_csv, 'w', newline='') as csvfile:
-        fieldnames = ['Time (s)'] + ['Detected']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        # shape rows correctly
-        row = {'Time (s)': None, 'Detected': None}
-        for time in detected_data.keys():
-            row['Time (s)'] = time
-            row['Detected'] = detected_data[time]
-            writer.writerow(row)
+# def write_to_csv(path_to_csv,detected_data):
+#     with open(path_to_csv, 'w', newline='') as csvfile:
+#         fieldnames = ['Time (s)'] + ['Detected']
+#         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+#         writer.writeheader()
+#         # shape rows correctly
+#         row = {'Time (s)': None, 'Detected': None}
+#         for time in detected_data.keys():
+#             row['Time (s)'] = time
+#             row['Area'] = detected_data[time]
+#             writer.writerow(row)
 
 def extract_RR(video_path):
     cap = cv2.VideoCapture(video_path)
@@ -43,7 +43,6 @@ def extract_RR(video_path):
     frame_count = 0
     frame_skip = 1
     roi = None
-    detected_data = {}
     cv2.namedWindow("Video Processing", cv2.WINDOW_KEEPRATIO)
     target_width = 1280
     areas = []
@@ -56,7 +55,7 @@ def extract_RR(video_path):
             cap.release()
             break
         # Rotate if there's an issue with the smartphone metadata interpretation
-        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+        #frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
         H, W, _ = frame.shape # get the frame dimensions
         
         if frame_count == 0:
@@ -86,7 +85,9 @@ def extract_RR(video_path):
                 max_contour = max(contours, key=cv2.contourArea)
                 area = cv2.contourArea(max_contour)
                 areas.append(area)
-                timestamps.append(time.time())
+                #timestamps.append(time.time())
+                timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0) # ms / 1000 => seconds
+
 
                 # Adjust contour coordinates to match full frame
                 max_contour_shifted = max_contour + np.array([x, y])  # Shift contour back to full-frame coordinates
@@ -122,10 +123,6 @@ def extract_RR(video_path):
             tracker.init(frame, roi)  # Initialize tracker with ROI
             print("ROI selected. Starting video processing...")
         
-        
-        
-
-        
         # Display the current frame
         aspRatio = W / H
         new_height = int(target_width / aspRatio)
@@ -148,18 +145,21 @@ def extract_RR(video_path):
     cap.release()
     cv2.destroyAllWindows()
     timestamps = np.array(timestamps) # convert for the normalistaion
-    timestamps -= timestamps[0]
-    return detected_data, areas, timestamps
+    #timestamps -= timestamps[0]
+    return areas, timestamps
 
 
 if __name__ == "__main__":
     #video_path = r"C:\Users\erutkovs\OneDrive - University College London\MRes sVNS project\Human trial\human_trial_recordings\data_06012025_pat_14\video\Human 014 060125\014_sVNS_C_1.6mA 1ms 20Hz 30s~3.mp4"  # Replace with the path to your video file
     #video_path = r"../../data_06012025_pat_14\video\Human 014 060125\014_sVNS_C_1.6mA 1ms 20Hz 30s~3.mp4"
     video_path = "../data_06012025_pat_14/video/Human 014 060125/014_sVNS_P_900uA 1ms 20Hz 30s.mp4"
-    detected_data, areas, timestamps = extract_RR(video_path)
+    csv_path = "../data_06012025_pat_14/video/processed/014_area_detection_test.csv"
+    areas, timestamps = extract_RR(video_path)
     #print("Final Detected Data:", detected_data)
-    #write_to_csv("../../data_06012025_pat_14/video/processed/014_sVNS_P_900uA 1ms 20Hz 30s~2.csv", detected_data)
-
+    #write_to_csv("../../data_06012025_pat_14/video/processed/014_area_detection_test.csv", areas)
+    df = pd.DataFrame({'Time (s)': timestamps, 'Area': areas})
+    df.to_csv(csv_path, index=False)
+    print(f"Data saved to {csv_path}")
     # Visualise
     plt.figure()
     plt.subplot(2,1,1)
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     print("Filter is stable? ", is_filter_stable(b,a))
 
     smoothed_areas = butter_lowpass_filter(areas, cutoff, fs, order)
-    plt.plot(smoothed_areas,linestyle='-', linewidth=2, color='b', label='Smoothed Area')
+    plt.plot(timestamps,smoothed_areas,linestyle='-', linewidth=2, color='b', label='Smoothed Area')
     plt.xlabel("Time (s)")
     plt.ylabel("Detected Area")
     plt.title("Smoothed Area Change Over Time")
