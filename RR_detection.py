@@ -38,7 +38,9 @@ def select_roi(frame):
 #             writer.writerow(row)
 
 def extract_RR(video_path):
+    global fps
     cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
     tracker = cv2.TrackerKCF_create()    
     frame_count = 0
     frame_skip = 1
@@ -84,8 +86,8 @@ def extract_RR(video_path):
             green_region = cv2.bitwise_and(frame_roi,frame_roi,mask=mask)
             gray = cv2.cvtColor(green_region, cv2.COLOR_BGR2GRAY)
             
-            sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=5)
-            sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=5)
+            sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+            sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
             edges = np.sqrt(sobel_x**2 + sobel_y**2)
             # Normalize and threshold to get binary edge image
             edges = np.uint8(255 * edges / np.max(edges))
@@ -97,12 +99,10 @@ def extract_RR(video_path):
             # Calculate edge metric (e.g., total edge pixel count)
             edge_metric = np.sum(edge_binary > 0)
             areas.append(edge_metric)
+            timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
                 #timestamps.append(time.time())
-            timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0) # ms / 1000 => seconds
+            timestamps.append(timestamp) # ms / 1000 => seconds
            
-    # Calculate edge metric (e.g., total edge pixel count)
-            edge_metric = np.sum(edge_binary > 0)
-
                 # Adjust contour coordinates to match full frame
                # max_contour_shifted = max_contour + np.array([x, y])  # Shift contour back to full-frame coordinates
 
@@ -114,6 +114,7 @@ def extract_RR(video_path):
             
             text_position = (x, y - 10 if y > 20 else y + h + 20)  # Adjust if near top edge
             cv2.putText(frame, f"Area = {edge_metric:.2f}", text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+            cv2.putText(frame, f"Timestamp: {timestamp: .2f}", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             # expandVal = 40
             # x1 = max(0, x-expandVal)
             # y1 = max(0, y-expandVal)
@@ -134,7 +135,15 @@ def extract_RR(video_path):
         else:
             print("Tracking lost. Re-select ROI...")
             roi = select_roi(frame)
-            tracker.init(frame, roi)  # Initialize tracker with ROI
+            #tracker.init(frame, roi)  # Initialize tracker with ROI
+            #x, y, w, h = roi
+            if roi and all(v > 0 for v in roi):
+                tracker = cv2.TrackerKCF_create()  # Reinitialize tracker
+                tracker.init(frame, roi)
+            else:
+                print("Invalid ROI selected, skipping this frame...")
+                continue  # Skip processing this frame
+            
             print("ROI selected. Starting video processing...")
         
         # Display the current frame
@@ -151,6 +160,7 @@ def extract_RR(video_path):
             print("Manual adjustment of ROI...")
             roi = select_roi(frame)
             tracker.init(frame, roi)  # Initialize tracker with ROI
+            x, y, w, h = roi
             print("ROI selected. Continuing video processing...")
 
         elif key == ord('q'):
@@ -174,6 +184,7 @@ if __name__ == "__main__":
     df = pd.DataFrame({'Time (s)': timestamps, 'Area': areas})
     df.to_csv(csv_path, index=False)
     print(f"Data saved to {csv_path}")
+    print(f"Video FPS: {fps:.2f}")
     # Visualise
     plt.figure()
     plt.subplot(2,1,1)
