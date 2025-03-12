@@ -41,7 +41,7 @@ def extract_RR(video_path):
     global fps
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
-    tracker = cv2.TrackerKCF_create()    
+    tracker = cv2.TrackerCSRT_create()    
     frame_count = 0
     frame_skip = 1
     roi = None
@@ -138,7 +138,7 @@ def extract_RR(video_path):
             #tracker.init(frame, roi)  # Initialize tracker with ROI
             #x, y, w, h = roi
             if roi and all(v > 0 for v in roi):
-                tracker = cv2.TrackerKCF_create()  # Reinitialize tracker
+                tracker = cv2.TrackerCSRT_create()  # Reinitialize tracker
                 tracker.init(frame, roi)
             else:
                 print("Invalid ROI selected, skipping this frame...")
@@ -159,6 +159,7 @@ def extract_RR(video_path):
         if key == ord('a'):
             print("Manual adjustment of ROI...")
             roi = select_roi(frame)
+            tracker = cv2.TrackerCSRT_create()  # Reinitialize tracker with CSRT
             tracker.init(frame, roi)  # Initialize tracker with ROI
             x, y, w, h = roi
             print("ROI selected. Continuing video processing...")
@@ -177,7 +178,7 @@ if __name__ == "__main__":
     #video_path = r"C:\Users\erutkovs\OneDrive - University College London\MRes sVNS project\Human trial\human_trial_recordings\data_06012025_pat_14\video\Human 014 060125\014_sVNS_C_1.6mA 1ms 20Hz 30s~3.mp4"  # Replace with the path to your video file
     #video_path = r"../../data_06012025_pat_14\video\Human 014 060125\014_sVNS_C_1.6mA 1ms 20Hz 30s~3.mp4"
     video_path = "../data_06012025_pat_14/video/Human 014 060125/014_sVNS_P_900uA 1ms 20Hz 30s.mp4"
-    csv_path = "../data_06012025_pat_14/video/processed/014_area_detection_test.csv"
+    csv_path = "../data_06012025_pat_14/video/processed/014_area_detection_test_CSRT.csv"
     areas, timestamps = extract_RR(video_path)
     #print("Final Detected Data:", detected_data)
     #write_to_csv("../../data_06012025_pat_14/video/processed/014_area_detection_test.csv", areas)
