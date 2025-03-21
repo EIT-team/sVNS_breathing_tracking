@@ -92,7 +92,7 @@ def extract_RR(video_path):
             # Normalize and threshold to get binary edge image
             edges = np.uint8(255 * edges / np.max(edges))
             
-            _, edge_binary = cv2.threshold(edges, 50, 255, cv2.THRESH_BINARY)
+            _, edge_binary = cv2.threshold(edges, 5, 255, cv2.THRESH_BINARY)
             sobel_edges_colored = cv2.merge([edge_binary, edge_binary, edge_binary])
             edges_black = cv2.bitwise_not(sobel_edges_colored)
             frame[y:y+h, x:x+w] = cv2.bitwise_and(frame[y:y+h, x:x+w], edges_black)
@@ -113,7 +113,7 @@ def extract_RR(video_path):
                 # cv2.drawContours(frame, [max_contour_shifted], -1, (0, 255, 0), 2)
             
             text_position = (x, y - 10 if y > 20 else y + h + 20)  # Adjust if near top edge
-            cv2.putText(frame, f"Area = {edge_metric:.2f}", text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+            cv2.putText(frame, f"Edge metric = {edge_metric:.2f}", text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             cv2.putText(frame, f"Timestamp: {timestamp: .2f}", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             # expandVal = 40
             # x1 = max(0, x-expandVal)
@@ -178,21 +178,21 @@ if __name__ == "__main__":
     #video_path = r"C:\Users\erutkovs\OneDrive - University College London\MRes sVNS project\Human trial\human_trial_recordings\data_06012025_pat_14\video\Human 014 060125\014_sVNS_C_1.6mA 1ms 20Hz 30s~3.mp4"  # Replace with the path to your video file
     #video_path = r"../../data_06012025_pat_14\video\Human 014 060125\014_sVNS_C_1.6mA 1ms 20Hz 30s~3.mp4"
     video_path = "../data_06012025_pat_14/video/Human 014 060125/014_sVNS_P_900uA 1ms 20Hz 30s.mp4"
-    csv_path = "../data_06012025_pat_14/video/processed/014_area_detection_test_CSRT.csv"
+    csv_path = "../data_06012025_pat_14/video/processed/014_edge_detection_test_CSRT_thrshld_5.csv"
     areas, timestamps = extract_RR(video_path)
     #print("Final Detected Data:", detected_data)
     #write_to_csv("../../data_06012025_pat_14/video/processed/014_area_detection_test.csv", areas)
-    df = pd.DataFrame({'Time (s)': timestamps, 'Area': areas})
+    df = pd.DataFrame({'Time (s)': timestamps, 'Edges': areas})
     df.to_csv(csv_path, index=False)
     print(f"Data saved to {csv_path}")
     print(f"Video FPS: {fps:.2f}")
     # Visualise
     plt.figure()
     plt.subplot(2,1,1)
-    plt.plot(timestamps,areas,marker='o',linestyle='-',color='b',label='Area change')
+    plt.plot(timestamps,areas,marker='o',linestyle='-',color='b',label='Edge change')
     plt.xlabel("Time (s)")
-    plt.ylabel("Detected Area")
-    plt.title("Area Change Over Time")
+    plt.ylabel("Detected Edges")
+    plt.title("Edge Change Over Time")
     plt.legend()
     plt.grid(True)
 
@@ -208,10 +208,10 @@ if __name__ == "__main__":
     print("Filter is stable? ", is_filter_stable(b,a))
 
     smoothed_areas = butter_lowpass_filter(areas, cutoff, fs, order)
-    plt.plot(timestamps,smoothed_areas,linestyle='-', linewidth=2, color='b', label='Smoothed Area')
+    plt.plot(timestamps,smoothed_areas,linestyle='-', linewidth=2, color='b', label='Smoothed Edges')
     plt.xlabel("Time (s)")
-    plt.ylabel("Detected Area")
-    plt.title("Smoothed Area Change Over Time")
+    plt.ylabel("Detected Edges")
+    plt.title("Smoothed Edges Change Over Time")
     plt.legend()
     plt.grid(True)
 
